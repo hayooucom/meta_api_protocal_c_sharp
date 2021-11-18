@@ -187,7 +187,10 @@ namespace SerialCom
                 try
                 {
                     if(comboBox_protocal.SelectedIndex == 1)
+                    {
                         metaverse_protocal_obj.unit_test();
+                        return;
+                    }
 
                     if (comboBoxCom.SelectedIndex == -1)
                     {

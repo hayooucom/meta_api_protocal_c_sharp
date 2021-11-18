@@ -69,20 +69,18 @@ namespace SerialCom
 
         }
         #region 协议执行
-        private int Process_metaverse_packet(UInt16 meta_api_cmdset, UInt16 meta_api_id, Byte[] meta_api_packet_buf, UInt16 meta_api_packet_len, Byte[] meta_api_data_buf, UInt16 meta_data_len)
+        private int Process_metaverse_packet(Byte version,UInt16 meta_api_cmdset, UInt16 meta_api_id, Byte[] meta_api_packet_buf, UInt16 meta_api_packet_len, Byte[] meta_api_data_buf, UInt16 meta_data_len)
         {
             if (meta_api_cmdset == 0)
             {
                     send_metaverse_unreal_data(1, 2, 3);
 
-                    if (mainform.rcv_pkg_counter_all % 300 == 1)
-                    {
-                        var spritfstr = String.Format(@"received len {0:D} ", meta_api_packet_len);
-                        mainform.textBoxReceive.Text += spritfstr + "\r\n"; ;
+                    var spritfstr = String.Format(@"version  {0:D} ,received len {1:D} ",version, meta_api_packet_len);
+                    mainform.textBoxReceive.Text += spritfstr + "\r\n"; ;
 
-                        mainform.textBoxReceive.SelectionStart = mainform.textBoxReceive.Text.Length;
-                        mainform.textBoxReceive.ScrollToCaret();//滚动到光标处
-                    }
+                    mainform.textBoxReceive.SelectionStart = mainform.textBoxReceive.Text.Length;
+                    mainform.textBoxReceive.ScrollToCaret();//滚动到光标处
+                    
             }
             save_packet();
             return 0;
@@ -335,11 +333,15 @@ namespace SerialCom
                     case 5:
                         {
                             if(meta_api_version == 2)
-                                meta_api_len |=  rx_data ;
+                            {
+                                meta_api_len |= rx_data;
+                                meta_api_state = 6;
+                            }
                             else
+                            {
                                 meta_api_len |= (UInt16)(((UInt16)rx_data) << 8);
-
-                            meta_api_state = 40;
+                                meta_api_state = 40;
+                            }
                         }
                         break;
                     case 40:
@@ -467,11 +469,11 @@ namespace SerialCom
                             meta_api_crc16 |= (UInt16)((UInt16)rx_data << 8);
                             meta_api_crc16_calc = crc16_obj.crc16_init();
 
-                            meta_api_crc16_calc = crc16_obj.crc16_update(meta_api_crc16_calc, meta_api_buf, (UInt16)(meta_api_buf_idx - 4));
+                            meta_api_crc16_calc = crc16_obj.crc16_update(meta_api_crc16_calc, meta_api_buf, (UInt16)(meta_api_buf_idx - 2));
 
                             if (meta_api_crc16 == meta_api_crc16_calc)
                             {
-                                Process_metaverse_packet(meta_api_cmdset, meta_api_cmdid, meta_api_buf, meta_api_len, meta_api_data_buf, meta_api_len);
+                                Process_metaverse_packet((Byte)meta_api_version, meta_api_cmdset, meta_api_cmdid, meta_api_buf, meta_api_len, meta_api_data_buf, meta_api_len);
                             }
 
                             meta_api_state = 0;
@@ -495,7 +497,7 @@ namespace SerialCom
 
                         if(meta_api_crc32_calc == meta_api_crc32)
                         {
-                            Process_metaverse_packet(meta_api_cmdset, meta_api_cmdid, meta_api_buf, meta_api_len, meta_api_data_buf, meta_api_len);
+                            Process_metaverse_packet((Byte)meta_api_version,meta_api_cmdset, meta_api_cmdid, meta_api_buf, meta_api_len, meta_api_data_buf, meta_api_len);
                         }
                         
                         meta_api_state = 0;
@@ -560,9 +562,11 @@ namespace SerialCom
             UInt16 cmd_id = 0;
             Byte extend_len = 0;
             UInt16 SEQ = 0;
+            Byte[] version_test = new byte[] {0,1,  2, 16 };
 
-            for ( version =16; version<17; version++)
+            for (int i = 0; i < version_test.Length; i++)
             {
+                version = version_test[i];
                 var buf = metaverseProtocalGen(version, data_type, cmd_type, ENC, cmd_set, cmd_id, extend_len, SEQ, data_buf, data_len);
 
                 metaverseProtocalRecev(buf, buf.Length);
