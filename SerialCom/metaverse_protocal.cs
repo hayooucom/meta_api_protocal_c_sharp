@@ -148,8 +148,6 @@ namespace SerialCom
             data_buffer.AddRange(data_buf);
             //Byte[] api_buf_all ;
             List<byte> buffer = new List<byte>();
-
-            version = 16;
             
             UInt16 SEQ = 0x0000;
             int i = 0;
@@ -661,7 +659,7 @@ namespace SerialCom
                 metaverseProtocalRecev(buf, buf.Length);
             }
             
-            var buf1 = metaverseProtocalGenMassive(16, data_type, cmd_type, ENC, cmd_set, cmd_id, data_buf,  data_len);
+            var buf1 = metaverseProtocalGenMassive(2, data_type, cmd_type, ENC, cmd_set, cmd_id, data_buf,  data_len);
 
             metaverseProtocalRecev(buf1, buf1.Length);
 
