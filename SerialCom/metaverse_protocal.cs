@@ -35,7 +35,7 @@ namespace SerialCom
         private int meta_api_buf_idx = 0;
         private UInt16 meta_api_extend_idx = 0;
         private List<byte> meta_api_buffer = new List<byte>();
-        private int total_packege_count = 0;
+        private int total_package_count = 0;
 
         private string last_save_data;
         private long last_time_ticks = 0;
@@ -90,7 +90,7 @@ namespace SerialCom
                     data_buf_all = meta_api_buffer.ToArray();
                     meta_api_buffer.Clear();
                     total_packege_len = data_buf_all.Length;
-                    total_packege_count++;
+                    total_package_count++;
                     /*
                     if (version == 16 )
                     {
@@ -105,7 +105,7 @@ namespace SerialCom
                 }
                 else
                 {
-                    total_packege_count++;
+                    total_package_count++;
                     meta_api_buffer.AddRange(meta_api_data_buf);
                     return 0;
                 }
@@ -114,15 +114,15 @@ namespace SerialCom
             if (meta_api_cmdset == 0 )
             {
                 send_metaverse_unreal_data(1, 2, 3);
-                bool recieve_ok = (version < 2) || ((version >= 2) && (total_packege_count - 1 == (SEQ & 0x7FFF)));
+                bool recieve_ok = (version < 2) || ((version >= 2) && (total_package_count - 1 == (SEQ & 0x7FFF)));
                 var spritfstr = "";
                 if ( recieve_ok )
                 {
-                   spritfstr = String.Format(@"recvok ! version  {0:D} ,received len {1:D} , packege_count {2:D}", version, total_packege_len, total_packege_count);
+                   spritfstr = String.Format(@"recvok ! version  {0:D} ,received len {1:D} , packege_count {2:D}", version, total_packege_len, total_package_count);
                 }
                 else
                 {
-                    spritfstr = String.Format(@"some package lost ! version  {0:D} ,received len {1:D} , packege_count {2:D}", version, total_packege_len, total_packege_count);
+                    spritfstr = String.Format(@"some package lost ! version  {0:D} ,received len {1:D} , packege_count {2:D}", version, total_packege_len, total_package_count);
                 }
                 mainform.textBoxReceive.Text += spritfstr + "\r\n"; ;
                 mainform.textBoxReceive.SelectionStart = mainform.textBoxReceive.Text.Length;
@@ -131,7 +131,7 @@ namespace SerialCom
 
             save_packet();
             meta_api_buffer = new List<byte>();
-            total_packege_count = 0;
+            total_package_count = 0;
             return 0;
         }
 
