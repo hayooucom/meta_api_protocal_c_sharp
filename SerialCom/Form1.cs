@@ -186,6 +186,9 @@ namespace SerialCom
             {
                 try
                 {
+                    if(comboBox_protocal.SelectedIndex == 1)
+                        metaverse_protocal_obj.unit_test();
+
                     if (comboBoxCom.SelectedIndex == -1)
                     {
                         MessageBox.Show("Error: 无效的端口,请重新选择", "Error");
@@ -241,9 +244,6 @@ namespace SerialCom
                     serialPort.Open();
 
                     disable_buttons();
-
-                    metaverse_protocal_obj.unit_test();
-
 
                     buttonOpenCloseCom.Text = "Stop Send";
                     rcv_pkg_counter = 0;

@@ -20,6 +20,7 @@ namespace SerialCom
         public Byte[] Uart_Rx_buf = new Byte[256];
         public Int32 Uart_Rx_idx = 0;
         private Byte meta_api_state = 0;
+        private Byte meta_api_cmd_type = 0;
         private Byte meta_api_extend_len = 0;
         private Byte meta_api_data_type = 0;
         private UInt32 meta_api_buf_start_idx = 0;
@@ -29,8 +30,8 @@ namespace SerialCom
         private UInt16 meta_api_seq = 0;
         private UInt16 meta_api_cmdset = 0;
         private UInt16 meta_api_cmdid = 0;
-        private Byte[] meta_api_data_buf = new Byte[256];
-        private Byte[] meta_api_buf = new Byte[256];
+        private Byte[] meta_api_data_buf = new Byte[65535];
+        private Byte[] meta_api_buf = new Byte[65535];
         private UInt16 meta_api_buf_idx = 0;
         private UInt16 meta_api_extend_idx = 0;
         private string last_save_data;
@@ -104,10 +105,48 @@ namespace SerialCom
         public Byte[] metaverseProtocalGen(Byte version,Byte data_type,Byte cmd_type,Byte ENC, UInt16 cmd_set, UInt16 cmd_id, Byte extend_len,UInt16 SEQ,  Byte[] data_buf, UInt16 data_len)
         {
             Byte[] api_buf;//= new Byte[];
+            UInt16 packet_len_all = (UInt16)(6 + data_len);
+            if (version == 0)
+            {
+                packet_len_all = (UInt16)(4 + data_len);
+                if (data_len > 63 - 4)
+                {
+                    packet_len_all = 63;
+                    data_len = (UInt16)(packet_len_all - 4);
+                }
+            }
+            if (version == 1)
+            {
+                packet_len_all = (UInt16)(6 + data_len);
+                if (data_len > 63 - 6)
+                {
+                    packet_len_all = 63;
+                    data_len = (UInt16)(packet_len_all - 6);
+                }
+            }
+            if (version == 2)
+            {
+                packet_len_all = (UInt16)(13 + data_len);
+                if (data_len > 4095 - 13)
+                {
+                    packet_len_all = 4095;
+                    data_len = (UInt16)(packet_len_all - 13);
+                }
+            }
+            if (version >= 16)
+            {
+                packet_len_all = (UInt16)(22 + data_len);
+                if (data_len > 65535 - 22 - extend_len)
+                {
+                    packet_len_all = 65535;
+                    data_len = (UInt16)(packet_len_all - 22 - extend_len);
+                }
+            }
+
             if (version < 16)
             {
                 UInt16 packet_len = 0;
-                UInt16 packet_len_all = (UInt16)(6 + data_len);
+                
                 api_buf = new Byte[packet_len_all];
 
                 if((cmd_type & 0x20) == 0)
@@ -119,8 +158,8 @@ namespace SerialCom
                     api_buf[packet_len++] = (Byte)(((version << 6) & 0xFF) | (packet_len_all & 0x3F));
                 else
                 {
-                    api_buf[packet_len++] = (Byte)(packet_len_all & 0xFF);
                     api_buf[packet_len++] = (Byte)(((version << 6) & 0xF0) | ((packet_len_all >> 8) & 0x0F));
+                    api_buf[packet_len++] = (Byte)(packet_len_all & 0xFF);
                 }
                 if (version == 1)
                 {
@@ -131,8 +170,6 @@ namespace SerialCom
                 {
                     api_buf[packet_len++] = (Byte)(cmd_set & 0xFF);
                     api_buf[packet_len++] = (Byte)((cmd_set >> 8) & 0xFF);
-                    api_buf[packet_len++] = (Byte)(cmd_id & 0xFF);
-                    api_buf[packet_len++] = (Byte)((cmd_id >> 8) & 0xFF);
                     api_buf[packet_len++] = (Byte)(cmd_id & 0xFF);
                     api_buf[packet_len++] = (Byte)((cmd_id >> 8) & 0xFF);
                     api_buf[packet_len++] = (Byte)(SEQ & 0xFF);
@@ -165,7 +202,7 @@ namespace SerialCom
             else
             {
                 UInt16 packet_len = 0;
-                UInt16 packet_len_all = (UInt16)(extend_len + 22 + data_len);
+
                 api_buf = new Byte[packet_len_all];
                 
                 api_buf[packet_len++] = 0x5A;
@@ -209,8 +246,11 @@ namespace SerialCom
         public void metaverseProtocalRecev(Byte[] buf, int size)
         {
             DateTime dt = DateTime.Now;
-            
-            string date1 = dt.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss.ffffff");
+            //meta_api_crc32_calc = crc32_obj.crc32_init();
+
+            //meta_api_crc32_calc = crc32_obj.crc32_update(meta_api_crc32_calc, buf, 1009);
+
+            //string date1 = dt.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss.ffffff");
 
             for (int i = 0; i < size; i++)
             {
@@ -224,7 +264,7 @@ namespace SerialCom
                     case 0:
                         if (rx_data == 0xFA || rx_data == 0xFB || rx_data == 0x5A)
                         {
-                            if(rx_data == 0xEA)
+                            if(rx_data == 0x5A)
                             {
                                 meta_api_state = 1;
                             }
@@ -235,7 +275,7 @@ namespace SerialCom
                             meta_api_extend_idx = 0;
                             meta_api_len = 0;
                             meta_api_buf_idx = 0;
-                            meta_api_buf = new Byte[256];
+                            meta_api_buf = new Byte[65535];
                             meta_api_buf[meta_api_buf_idx++] = rx_data;
                         }
                         break;
@@ -251,7 +291,8 @@ namespace SerialCom
                         break;
                     case 2:
 
-                        if(meta_api_buf[meta_api_buf_idx-2] == 0x5A ){
+                        if(meta_api_buf[meta_api_buf_idx-2] == 0xEA)
+                        {
                             meta_api_version = (Int16)(rx_data & 0x3F);
                         }
                         else
@@ -261,10 +302,18 @@ namespace SerialCom
 
                         meta_api_rx_idx = 0;
                         
-                        if (meta_api_version <= 2)
+                        if (meta_api_version < 2)
                         {
                             meta_api_len = (Byte)(rx_data & 0x3F);
-                            meta_api_state = 6;
+                            if(meta_api_version == 0)
+                                meta_api_state = 17;
+                            else
+                                meta_api_state = 6;
+                        }else if (meta_api_version == 2)
+                        {
+                            
+                            meta_api_len = (UInt16)((rx_data & 0x3F) << 8);
+                            meta_api_state = 5;
                         }
                         else
                         {
@@ -285,8 +334,17 @@ namespace SerialCom
                         break;
                     case 5:
                         {
-                            meta_api_len |= (UInt16)(((UInt16)rx_data) << 8);
+                            if(meta_api_version == 2)
+                                meta_api_len |=  rx_data ;
+                            else
+                                meta_api_len |= (UInt16)(((UInt16)rx_data) << 8);
+
+                            meta_api_state = 40;
                         }
+                        break;
+                    case 40:
+                        meta_api_cmd_type = rx_data;
+                        meta_api_state = 6;
                         break;
                     case 6:
                         meta_api_cmdset = rx_data;
@@ -304,25 +362,38 @@ namespace SerialCom
                     case 8:
                         meta_api_cmdid = rx_data;
 
-                        if (meta_api_version < 2)
+                        if (meta_api_version <= 1)
                             meta_api_state = 17;
                         else
                             meta_api_state = 9;
                         break;
                     case 9:
                         meta_api_cmdid |= (UInt16)(((UInt16)rx_data) << 8);
+                        
+                        if (meta_api_version == 2)
+                            meta_api_state = 13;
+                        else
+                            meta_api_state = 41;
+                        break;
+
+                    case 41:
+                        //reserv
                         meta_api_state = 10;
                         break;
                     case 10:
+                        //reserv
                         meta_api_state = 11;
                         break;
                     case 11:
                         meta_api_extend_len = (Byte)(rx_data & 0x0F);
-                        meta_api_state = 12;
+                        if(meta_api_extend_len>0)
+                            meta_api_state = 12;
+                        else
+                            meta_api_state = 13;
                         break;
                     case 12:
                         meta_api_extend_idx++;
-                        if(meta_api_extend_idx == meta_api_extend_len)
+                        if (meta_api_extend_idx == meta_api_extend_len)
                         {
                             meta_api_state = 13;
                         }
@@ -351,7 +422,7 @@ namespace SerialCom
 
                         UInt16 crc16_d = crc16_obj.crc16_init();
 
-                        meta_api_crc16_calc = crc16_obj.crc16_update(crc16_d, meta_api_buf, meta_api_len);
+                        meta_api_crc16_calc = crc16_obj.crc16_update(crc16_d, meta_api_buf, (UInt16)(meta_api_buf_idx - 2));
 
                         if(meta_api_crc16 != meta_api_crc16_calc)
                         {
@@ -367,10 +438,12 @@ namespace SerialCom
                         meta_api_rx_idx++;
 
                         UInt16 data_len = 0;
-                        if (meta_api_version == 1)
+                        if (meta_api_version == 0)
+                            data_len = (UInt16)(meta_api_len - 4);
+                        else if (meta_api_version == 1)
                             data_len = (UInt16)(meta_api_len - 6);
                         else if (meta_api_version == 2)
-                            data_len = (UInt16)(meta_api_len - 11);
+                            data_len = (UInt16)(meta_api_len - 13);
                         else if (meta_api_version >= 16)
                             data_len = (UInt16)(meta_api_len - 22 - meta_api_extend_len);
 
@@ -380,7 +453,7 @@ namespace SerialCom
                         }
                         break;
                     case 18:
-                        if (meta_api_version < 16)
+                        if (meta_api_version <=1)
                             meta_api_crc16 = (UInt16)rx_data;
                         else
                             meta_api_crc32 = (UInt32)rx_data;
@@ -389,12 +462,12 @@ namespace SerialCom
                         break;
                     case 19:
 
-                        if (meta_api_version < 16)
+                        if (meta_api_version <= 1)
                         {
                             meta_api_crc16 |= (UInt16)((UInt16)rx_data << 8);
                             meta_api_crc16_calc = crc16_obj.crc16_init();
 
-                            meta_api_crc16_calc = crc16_obj.crc16_update(meta_api_crc16_calc, meta_api_buf, meta_api_len);
+                            meta_api_crc16_calc = crc16_obj.crc16_update(meta_api_crc16_calc, meta_api_buf, (UInt16)(meta_api_buf_idx - 4));
 
                             if (meta_api_crc16 == meta_api_crc16_calc)
                             {
@@ -418,8 +491,7 @@ namespace SerialCom
                     case 21:
                         meta_api_crc32 |= (UInt32)((UInt32)rx_data << 24);
                         meta_api_crc32_calc = crc32_obj.crc32_init();
-
-                        meta_api_crc32_calc = crc32_obj.crc32_update(meta_api_crc32_calc, meta_api_buf, meta_api_len);
+                        meta_api_crc32_calc = crc32_obj.crc32_update(meta_api_crc32_calc, buf, (UInt16)(meta_api_buf_idx - 4));
 
                         if(meta_api_crc32_calc == meta_api_crc32)
                         {
@@ -474,7 +546,7 @@ namespace SerialCom
         public void unit_test()
         {
             //(Byte version, Byte data_type, Byte cmd_type, Byte ENC, UInt16 cmd_set, UInt16 cmd_id, Byte extend_len, UInt16 SEQ, Byte[] data_buf, UInt16 data_len)
-            var data_len = 1000;
+            UInt16 data_len = 1000;
             var data_buf = new Byte[data_len];
             for(int i = 0; i < data_len; i++)
             {
@@ -482,14 +554,14 @@ namespace SerialCom
             }
             Byte version;
             Byte data_type = 1;
-            Byte cmd_type = 0x20;
+            Byte cmd_type = 0x40;
             Byte ENC = 0;
             UInt16 cmd_set = 0;
             UInt16 cmd_id = 0;
             Byte extend_len = 0;
             UInt16 SEQ = 0;
 
-            for ( version =0; version<16; version++)
+            for ( version =16; version<17; version++)
             {
                 var buf = metaverseProtocalGen(version, data_type, cmd_type, ENC, cmd_set, cmd_id, extend_len, SEQ, data_buf, data_len);
 
