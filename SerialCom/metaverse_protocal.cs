@@ -26,14 +26,16 @@ namespace SerialCom
         private UInt32 meta_api_buf_start_idx = 0;
         private Int16 meta_api_version = 0;
         private UInt16 meta_api_len = 0;
-        private Int16 meta_api_rx_idx = 0;
+        private UInt16 meta_api_rx_idx = 0;
         private UInt16 meta_api_seq = 0;
         private UInt16 meta_api_cmdset = 0;
         private UInt16 meta_api_cmdid = 0;
         private Byte[] meta_api_data_buf = new Byte[65535];
         private Byte[] meta_api_buf = new Byte[65535];
-        private UInt16 meta_api_buf_idx = 0;
+        private int meta_api_buf_idx = 0;
         private UInt16 meta_api_extend_idx = 0;
+        private List<byte> meta_api_buffer = new List<byte>();
+
         private string last_save_data;
         private long last_time_ticks = 0;
 
@@ -69,20 +71,57 @@ namespace SerialCom
 
         }
         #region 协议执行
-        private int Process_metaverse_packet(Byte version,UInt16 meta_api_cmdset, UInt16 meta_api_id, Byte[] meta_api_packet_buf, UInt16 meta_api_packet_len, Byte[] meta_api_data_buf, UInt16 meta_data_len)
+        private int Process_metaverse_packet(Byte version,UInt16 meta_api_cmdset, UInt16 meta_api_id, UInt16 SEQ, 
+            Byte[] meta_api_packet_buf, UInt16 meta_api_packet_len,  Byte[] meta_api_data_buf, UInt16 meta_data_len)
         {
-            if (meta_api_cmdset == 0)
+            Byte[] data_buf_all=new Byte[1];
+            int total_packege_len = meta_data_len;
+
+            if (version < 2)
+            {
+                data_buf_all = meta_api_data_buf;
+            }
+            else
+            {
+                if ((SEQ & 0x8000) > 0)
+                {
+                    meta_api_buffer.AddRange(meta_api_data_buf);
+                    data_buf_all = meta_api_buffer.ToArray();
+                    meta_api_buffer.Clear();
+                    total_packege_len = data_buf_all.Length;
+                    /*
+                    if (version == 16 )
+                    {
+                        for (int i = 0; i < meta_data_len; i++)
+                        {
+                            if (data_buf_all[i] != (Byte)i)
+                            {
+                                Console.WriteLine("seems error");
+                            }
+                        }
+                    }*/
+                }
+                else
+                {
+                    meta_api_buffer.AddRange(meta_api_data_buf);
+                    return 0;
+                }
+            }
+
+            if (meta_api_cmdset == 0 )
             {
                     send_metaverse_unreal_data(1, 2, 3);
 
-                    var spritfstr = String.Format(@"version  {0:D} ,received len {1:D} ",version, meta_api_packet_len);
+                    var spritfstr = String.Format(@"version  {0:D} ,received len {1:D} ",version, total_packege_len);
                     mainform.textBoxReceive.Text += spritfstr + "\r\n"; ;
 
                     mainform.textBoxReceive.SelectionStart = mainform.textBoxReceive.Text.Length;
                     mainform.textBoxReceive.ScrollToCaret();//滚动到光标处
                     
             }
+
             save_packet();
+            meta_api_buffer = new List<byte>();
             return 0;
         }
 
@@ -99,7 +138,46 @@ namespace SerialCom
             Byte[] meta_api_data_buf;
             UInt16 meta_data_len;
         };*/
+        public Byte[] metaverseProtocalGenMassive(Byte version, Byte data_type, Byte cmd_type, Byte ENC, UInt16 cmd_set, UInt16 cmd_id,  Byte[] data_buf, UInt32 data_len)
+        {
+            Byte[] api_buf;
+            UInt16 max_payload = 65535 - 22;
+            Byte[] api_buf_all = new byte[(data_len/ max_payload+1) *65535];
+            int api_buf_all_idx = 0;
+            List<byte> data_buffer = new List<byte>(data_buf.Length);
+            data_buffer.AddRange(data_buf);
+            //Byte[] api_buf_all ;
+            List<byte> buffer = new List<byte>();
 
+            version = 16;
+            
+            UInt16 SEQ = 0x0000;
+            int i = 0;
+            for (;i< data_len; i+= max_payload)
+            {
+                UInt16 payload_len = max_payload;
+                if (i>= (int)data_len - (int)max_payload)
+                {
+                    SEQ |= 0x8000;
+                    payload_len = (UInt16)(data_len - i);
+                }
+                Byte[] data_buf2 = data_buffer.Skip(i).ToArray();
+                /*Byte[] data_buf2 = new byte[payload_len];//data_buffer.Skip(i).ToArray();
+                for(int j=0;j< payload_len; j++)
+                {
+                    data_buf2[j] = data_buf[i + j];
+                }*/
+                api_buf = metaverseProtocalGen(version, data_type, cmd_type, ENC, cmd_set, cmd_id, 0, SEQ, data_buf2,payload_len);
+                buffer.AddRange(api_buf);
+                /*for (int j = 0; j < api_buf.Length; j++)
+                {
+                    api_buf_all[api_buf_all_idx ++ ] = api_buf[j];
+                }*/
+                SEQ++;
+            }
+            //return api_buf_all;
+            return buffer.ToArray();
+        }
         public Byte[] metaverseProtocalGen(Byte version,Byte data_type,Byte cmd_type,Byte ENC, UInt16 cmd_set, UInt16 cmd_id, Byte extend_len,UInt16 SEQ,  Byte[] data_buf, UInt16 data_len)
         {
             Byte[] api_buf;//= new Byte[];
@@ -249,13 +327,18 @@ namespace SerialCom
             //meta_api_crc32_calc = crc32_obj.crc32_update(meta_api_crc32_calc, buf, 1009);
 
             //string date1 = dt.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss.ffffff");
-
+            try { 
             for (int i = 0; i < size; i++)
             {
                 Byte rx_data = buf[i];
                 if (meta_api_state >= 1)
                 {
+
                     meta_api_buf[meta_api_buf_idx++] = rx_data;
+                    if (meta_api_buf_idx > 65535)
+                    {
+                        meta_api_state = 0;
+                    }
                 }
                 switch (meta_api_state)
                 {
@@ -473,7 +556,7 @@ namespace SerialCom
 
                             if (meta_api_crc16 == meta_api_crc16_calc)
                             {
-                                Process_metaverse_packet((Byte)meta_api_version, meta_api_cmdset, meta_api_cmdid, meta_api_buf, meta_api_len, meta_api_data_buf, meta_api_len);
+                                Process_metaverse_packet((Byte)meta_api_version, meta_api_cmdset, meta_api_cmdid, meta_api_seq, meta_api_buf, meta_api_len, meta_api_data_buf, meta_api_rx_idx);
                             }
 
                             meta_api_state = 0;
@@ -493,17 +576,23 @@ namespace SerialCom
                     case 21:
                         meta_api_crc32 |= (UInt32)((UInt32)rx_data << 24);
                         meta_api_crc32_calc = crc32_obj.crc32_init();
-                        meta_api_crc32_calc = crc32_obj.crc32_update(meta_api_crc32_calc, buf, (UInt16)(meta_api_buf_idx - 4));
+                        meta_api_crc32_calc = crc32_obj.crc32_update(meta_api_crc32_calc, meta_api_buf, (UInt16)(meta_api_buf_idx - 4));
 
                         if(meta_api_crc32_calc == meta_api_crc32)
                         {
-                            Process_metaverse_packet((Byte)meta_api_version,meta_api_cmdset, meta_api_cmdid, meta_api_buf, meta_api_len, meta_api_data_buf, meta_api_len);
+                            Process_metaverse_packet((Byte)meta_api_version,meta_api_cmdset, meta_api_cmdid, meta_api_seq, meta_api_buf, meta_api_len, meta_api_data_buf, meta_api_rx_idx);
                         }
                         
                         meta_api_state = 0;
                         break;
 
                 }
+            }
+
+            }
+            catch (System.Exception ex)
+            {
+                return;
             }
         }
         #endregion
@@ -548,7 +637,7 @@ namespace SerialCom
         public void unit_test()
         {
             //(Byte version, Byte data_type, Byte cmd_type, Byte ENC, UInt16 cmd_set, UInt16 cmd_id, Byte extend_len, UInt16 SEQ, Byte[] data_buf, UInt16 data_len)
-            UInt16 data_len = 1000;
+            UInt32 data_len = 1000000;
             var data_buf = new Byte[data_len];
             for(int i = 0; i < data_len; i++)
             {
@@ -561,16 +650,20 @@ namespace SerialCom
             UInt16 cmd_set = 0;
             UInt16 cmd_id = 0;
             Byte extend_len = 0;
-            UInt16 SEQ = 0;
-            Byte[] version_test = new byte[] {0,1,  2, 16 };
-
+            UInt16 SEQ = 0x8000;
+            Byte[] version_test = new byte[] { 0, 1, 2, 16, 0, 1, 2, 16 };
+            
             for (int i = 0; i < version_test.Length; i++)
             {
                 version = version_test[i];
-                var buf = metaverseProtocalGen(version, data_type, cmd_type, ENC, cmd_set, cmd_id, extend_len, SEQ, data_buf, data_len);
+                var buf = metaverseProtocalGen(version, data_type, cmd_type, ENC, cmd_set, cmd_id, extend_len, SEQ, data_buf, (UInt16)data_len);
 
                 metaverseProtocalRecev(buf, buf.Length);
             }
+            
+            var buf1 = metaverseProtocalGenMassive(16, data_type, cmd_type, ENC, cmd_set, cmd_id, data_buf,  data_len);
+
+            metaverseProtocalRecev(buf1, buf1.Length);
 
         }
     }
