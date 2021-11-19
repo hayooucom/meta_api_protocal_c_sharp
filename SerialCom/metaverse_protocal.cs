@@ -96,6 +96,7 @@ namespace SerialCom
             {
                 data_buf_all = meta_api_data_buf;
                 total_packege_len2 = meta_data_len;
+                total_package_count++;
                 meta_api_package_buffer.AddRange(meta_api_packet_buf);
             }
             else
@@ -786,9 +787,10 @@ namespace SerialCom
         public void unit_test()
         {
             //(Byte version, Byte data_type, Byte cmd_type, Byte ENC, UInt16 cmd_set, UInt16 cmd_id, Byte extend_len, UInt16 SEQ, Byte[] data_buf, UInt16 data_len)
-            UInt32 data_len = 100000;
+            UInt32 data_len = 200000;
             var data_buf = new Byte[data_len];
-            for(int i = 0; i < data_len; i++)
+            Random rd = new Random();
+            for (int i = 0; i < data_len; i++)
             {
                 data_buf[i] = (Byte)i;
             }
@@ -800,8 +802,10 @@ namespace SerialCom
             UInt16 cmd_id = 0;
             Byte extend_len = 0;
             UInt16 SEQ = 0x8000;
-            Byte[] version_test = new byte[] { 0, 1, 2, 16, 0, 1, 2, 16 };
+
+            Byte[] version_test = new byte[] { 0, 0,1, 1,2, 2, 16, 0, 1, 2, 16 };
             long start_time_pc_ms = DateTime.Now.ToUniversalTime().Ticks / 10000;
+            
             for (int i = 0; i < version_test.Length; i++)
             {
                 version = version_test[i];
@@ -811,17 +815,44 @@ namespace SerialCom
                     data_len2 = 65535 - 22;
                 }
                 var buf = metaverseProtocalGen(version, data_type, cmd_type, ENC, cmd_set, cmd_id, extend_len, SEQ, data_buf, (UInt16)data_len2);
+                //for test err
+                if (false)
+                {
+                    int rand = rd.Next(100);
+                    if (rand > 80)
+                    {
+                        mainform.msg_box_print(String.Format(@"insert err byte in version {0:D}  ", version));
+                        buf[rd.Next(buf.Length - 1)] = (Byte)rd.Next(255);
+                    }
+                }
 
                 metaverseProtocalRecev(buf, buf.Length);
             }
             
-            var buf1 = metaverseProtocalGenMassive(2, data_type, cmd_type, ENC, cmd_set, cmd_id, data_buf,  data_len);
+            version_test = new byte[] {   2, 2, 16, 16 };
+            for (int i = 0; i < version_test.Length; i++)
+            {
+                version = version_test[i];
 
-            metaverseProtocalRecev(buf1, buf1.Length);
+                var buf1 = metaverseProtocalGenMassive(version, data_type, cmd_type, ENC, cmd_set, cmd_id, data_buf, data_len);
+                if (false)
+                {
+                    int err_bytes = 3;
+                    for (int j = 0; j < err_bytes; j++)
+                    {
+                        int err_idx = rd.Next(buf1.Length - 1);
+                        //mainform.msg_box_print(String.Format(@"insert err byte in version {0:D} ,err_idx: {1:D} ", version, err_idx));
+                        buf1[err_idx] = (Byte)rd.Next(255);
+                    }
 
-            buf1 = metaverseProtocalGenMassive(16, data_type, cmd_type, ENC, cmd_set, cmd_id, data_buf, data_len);
+                    mainform.msg_box_print(String.Format(@"insert err {0:D} byte in version {1:D} ",err_bytes,version));
+                }
+                metaverseProtocalRecev(buf1, buf1.Length);
+            }
 
-            metaverseProtocalRecev(buf1, buf1.Length);
+            var buf2 = metaverseProtocalGenMassive(16, data_type, cmd_type, ENC, cmd_set, cmd_id, data_buf, data_len);
+
+            metaverseProtocalRecev(buf2, buf2.Length);
 
             //the print will need time ,so will clear quick ,to test the real time use
             mainform.msg_box_print(String.Format(@"test finished,send&recv time used  {0:F3} ms ", DateTime.Now.ToUniversalTime().Ticks / 10000 - start_time_pc_ms));
