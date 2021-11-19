@@ -34,7 +34,8 @@ namespace SerialCom
         private Byte[] meta_api_buf = new Byte[65535];
         private int meta_api_buf_idx = 0;
         private UInt16 meta_api_extend_idx = 0;
-        private List<byte> meta_api_buffer = new List<byte>();
+        private List<byte> meta_api_package_buffer = new List<byte>();
+        private List<byte> meta_api_data_buffer = new List<byte>();
         private int total_package_count = 0;
         private int total_packege_len2 = 0;
 
@@ -77,6 +78,7 @@ namespace SerialCom
             Byte[] meta_api_packet_buf, UInt16 meta_api_packet_len,  Byte[] meta_api_data_buf, UInt16 meta_data_len)
         {
             Byte[] data_buf_all=new Byte[1];
+            Byte[] package_buf_all = new Byte[1];
             int total_packege_len = meta_data_len;
             
 
@@ -84,14 +86,16 @@ namespace SerialCom
             {
                 data_buf_all = meta_api_data_buf;
                 total_packege_len2 = meta_data_len;
+                meta_api_package_buffer.AddRange(meta_api_packet_buf);
             }
             else
             {
                 if ((SEQ & 0x8000) > 0)
                 {
-                    meta_api_buffer.AddRange(meta_api_data_buf);
-                    data_buf_all = meta_api_buffer.ToArray();
-                    meta_api_buffer.Clear();
+                    meta_api_data_buffer.AddRange(meta_api_data_buf);
+                    meta_api_package_buffer.AddRange(meta_api_packet_buf);
+                    data_buf_all = meta_api_data_buffer.ToArray();
+                    meta_api_data_buffer.Clear();
                     total_packege_len2 += meta_data_len;
                     total_packege_len = data_buf_all.Length;
                     total_package_count++;
@@ -111,7 +115,8 @@ namespace SerialCom
                 {
                     total_package_count++;
                     total_packege_len2 += meta_data_len;
-                    meta_api_buffer.AddRange(meta_api_data_buf);
+                    meta_api_data_buffer.AddRange(meta_api_data_buf);
+                    meta_api_package_buffer.AddRange(meta_api_packet_buf);
                     return 0;
                 }
             }
@@ -134,8 +139,9 @@ namespace SerialCom
                 mainform.textBoxReceive.ScrollToCaret();//滚动到光标处
             }
 
-            save_packet();
-            meta_api_buffer = new List<byte>();
+            save_packet(meta_api_package_buffer.ToArray());
+            meta_api_data_buffer = new List<byte>();
+            meta_api_package_buffer = new List<byte>();
             total_packege_len2 = 0;
             total_package_count = 0;
             return 0;
@@ -617,7 +623,7 @@ namespace SerialCom
         }
         #endregion
 
-        private void save_packet()
+        private void save_packet(Byte [] data_buf_all)
         {
             long time_passed_ms = DateTime.Now.ToUniversalTime().Ticks / 10000 - mainform.start_time_ms;                                                                                                                                                                      // //im the author :dGhpcyBwcm9ncmFtIGlzIHdyaXR0ZW4gYnkgeW91a3BhbkBnbWFpbC5jb20=
 
@@ -630,7 +636,7 @@ namespace SerialCom
                     {
                         var time_info = "";
                         //version,timstamp,counter,buf_data
-                        var data_hex_str = BitConverter.ToString(meta_api_data_buf, 0, meta_api_len).Replace("-", string.Empty);
+                        var data_hex_str = BitConverter.ToString(data_buf_all, 0, meta_api_len).Replace("-", string.Empty);
                         if (last_time_ticks != time_passed_ms)
                         {
                             last_time_ticks = time_passed_ms;
