@@ -31,7 +31,7 @@ namespace SerialCom
         private UInt16 meta_api_cmdset = 0;
         private UInt16 meta_api_cmdid = 0;
         private Byte[] meta_api_data_buf = new Byte[65535];
-        private Byte[] meta_api_buf = new Byte[65535];
+        private Byte[] meta_api_buf = new Byte[65536*2];
         private int meta_api_buf_idx = 0;
         private UInt16 meta_api_extend_idx = 0;
         private List<byte> meta_api_package_buffer = new List<byte>();
@@ -361,7 +361,7 @@ namespace SerialCom
                 {
 
                     meta_api_buf[meta_api_buf_idx++] = rx_data;
-                    if (meta_api_buf_idx >= 65535)
+                    if (meta_api_buf_idx >= 65536 * 2 - 1)
                     {
                         meta_api_state = 0;
                     }
