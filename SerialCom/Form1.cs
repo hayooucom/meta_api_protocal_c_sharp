@@ -188,7 +188,11 @@ namespace SerialCom
                 {
                     if(comboBox_protocal.SelectedIndex == 1)
                     {
-                        metaverse_protocal_obj.unit_test();
+                        for(int i = 0; i < 100; i++)
+                        {
+                            metaverse_protocal_obj.unit_test();
+                        }
+                        
                         return;
                     }
 

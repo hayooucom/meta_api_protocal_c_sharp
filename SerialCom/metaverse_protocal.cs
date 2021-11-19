@@ -24,14 +24,18 @@ namespace SerialCom
         private Byte meta_api_extend_len = 0;
         private Byte meta_api_data_type = 0;
         private UInt32 meta_api_buf_start_idx = 0;
+        private Byte[] meta_api_support_versions = new byte[] { 0,1,2,16};
+        private Byte meta_api_min_support_version = 2;
+        private Byte meta_api_max_support_version = 16;
         private Int16 meta_api_version = 0;
         private UInt16 meta_api_len = 0;
+        private UInt16 meta_api_data_len = 0;
         private UInt16 meta_api_rx_idx = 0;
         private UInt16 meta_api_seq = 0;
         private UInt16 meta_api_cmdset = 0;
         private UInt16 meta_api_cmdid = 0;
-        private Byte[] meta_api_data_buf = new Byte[65535];
-        private Byte[] meta_api_buf = new Byte[65536*2];
+        private Byte[] meta_api_data_buf = new Byte[65536];
+        private Byte[] meta_api_buf = new Byte[65536];
         private int meta_api_buf_idx = 0;
         private UInt16 meta_api_extend_idx = 0;
         private List<byte> meta_api_package_buffer = new List<byte>();
@@ -135,8 +139,8 @@ namespace SerialCom
                     spritfstr = String.Format(@"some package lost ! version  {0:D} ,received len {1:D} , packege_count {2:D}", version, total_packege_len2, total_package_count);
                 }
                 mainform.textBoxReceive.Text += spritfstr + "\r\n"; ;
-                mainform.textBoxReceive.SelectionStart = mainform.textBoxReceive.Text.Length;
-                mainform.textBoxReceive.ScrollToCaret();//滚动到光标处
+                //mainform.textBoxReceive.SelectionStart = mainform.textBoxReceive.Text.Length;
+                //mainform.textBoxReceive.ScrollToCaret();//滚动到光标处
             }
 
             save_packet(meta_api_package_buffer.ToArray());
@@ -344,6 +348,43 @@ namespace SerialCom
             return api_buf;
         }
 
+        private UInt16 get_data_len(Int16 version, UInt16 package_len, UInt16 extend_len)
+        {
+            UInt16 data_len = 0;
+            if (version == 0)
+                data_len = (UInt16)(package_len - 4);
+            else if (version == 1)
+                data_len = (UInt16)(package_len - 6);
+            else if (version == 2)
+                data_len = (UInt16)(package_len - 13);
+            else if (version >= 16)
+            {
+                data_len = (UInt16)(package_len - 22 - extend_len);
+            }
+            return data_len;
+        }
+
+        private bool meata_version_check(byte version)
+        {
+
+            for (int j=0;j< meta_api_support_versions.Length; j++)
+            {
+                if (version == meta_api_support_versions[j])
+                {
+                    return true;
+                }
+            }
+            return false;
+            /*
+            //version check
+            if ((meta_api_version < meta_api_min_support_version) ||
+                (meta_api_version > meta_api_max_support_version) ||
+                (meta_api_version >= 3 && meta_api_version < 16) || meta_api_version > 16)
+            {
+                meta_api_state = 0;
+                break;
+            }*/
+        }
         #region 协议拆包
         public void metaverseProtocalRecev(Byte[] buf, int size)
         {
@@ -359,210 +400,285 @@ namespace SerialCom
                 Byte rx_data = buf[i];
                 if (meta_api_state >= 1)
                 {
-
                     meta_api_buf[meta_api_buf_idx++] = rx_data;
-                    if (meta_api_buf_idx >= 65536 * 2 - 1)
+                    if (meta_api_buf_idx >= 65536 )
                     {
                         meta_api_state = 0;
                     }
                 }
-                switch (meta_api_state)
-                {
-                    case 0:
-                        if (rx_data == 0xFA || rx_data == 0xFB || rx_data == 0x5A)
-                        {
-                            if(rx_data == 0x5A)
+                    switch (meta_api_state)
+                    {
+                        case 0:
+                            meta_api_buf_idx = 0;
+                            if (rx_data == 0xFA || rx_data == 0xFB || rx_data == 0x5A)
                             {
-                                meta_api_state = 1;
+                                if (rx_data == 0x5A)
+                                {
+                                    meta_api_state = 1;
+                                }
+                                else
+                                {
+                                    if(meta_api_min_support_version > 2)
+                                    {
+                                        break;
+                                    }
+                                    meta_api_state = 2;
+                                }
+                                meta_api_extend_idx = 0;
+                                meta_api_len = 0;
+                                meta_api_data_len = 0;
+                                
+                                meta_api_buf = new Byte[65536];
+                                meta_api_buf[meta_api_buf_idx++] = rx_data;
                             }
-                            else
+                            break;
+                        case 1:
+                            if (rx_data == 0xEA)
                             {
                                 meta_api_state = 2;
                             }
-                            meta_api_extend_idx = 0;
-                            meta_api_len = 0;
-                            meta_api_buf_idx = 0;
-                            meta_api_buf = new Byte[65535];
-                            meta_api_buf[meta_api_buf_idx++] = rx_data;
-                        }
-                        break;
-                    case 1:
-                        if (rx_data == 0xEA)
-                        {
-                            meta_api_state = 2;
-                        }
-                        else
-                        {
-                            meta_api_state = 0;
-                        }
-                        break;
-                    case 2:
-
-                        if(meta_api_buf[meta_api_buf_idx-2] == 0xEA)
-                        {
-                            meta_api_version = (Int16)(rx_data & 0x3F);
-                        }
-                        else
-                        {
-                            meta_api_version = (Byte)(rx_data >> 6);
-                        }
-
-                        meta_api_rx_idx = 0;
-                        
-                        if (meta_api_version < 2)
-                        {
-                            meta_api_len = (Byte)(rx_data & 0x3F);
-                            if(meta_api_version == 0)
-                                meta_api_state = 17;
                             else
-                                meta_api_state = 6;
-                        }else if (meta_api_version == 2)
-                        {
-                            
-                            meta_api_len = (UInt16)((rx_data & 0x3F) << 8);
-                            meta_api_state = 5;
-                        }
-                        else
-                        {
-                            meta_api_state = 3;
-                        }
-                        break;
-                    case 3:
-                        {
-                            meta_api_data_type = rx_data;
-                            meta_api_state = 4;
-                        }
-                        break;
-                    case 4:
-                        {
-                            meta_api_len = (UInt16)(rx_data);
-                            meta_api_state = 5;
-                        }
-                        break;
-                    case 5:
-                        {
-                            if(meta_api_version == 2)
                             {
-                                meta_api_len |= rx_data;
-                                meta_api_state = 6;
+                                meta_api_state = 0;
+                            }
+                            break;
+                        case 2:
+
+                            if (meta_api_buf[meta_api_buf_idx - 2] == 0xEA)
+                            {
+                                meta_api_version = (Int16)(rx_data & 0x3F);
+                                if (meta_api_version < 16)
+                                {
+                                    meta_api_state = 0;
+                                    break;
+                                }
                             }
                             else
                             {
-                                meta_api_len |= (UInt16)(((UInt16)rx_data) << 8);
-                                meta_api_state = 40;
+                                meta_api_version = (Byte)(rx_data >> 6);
                             }
-                        }
-                        break;
-                    case 40:
-                        meta_api_cmd_type = rx_data;
-                        meta_api_state = 6;
-                        break;
-                    case 6:
-                        meta_api_cmdset = rx_data;
+                            //version check
+                            if (! meata_version_check((Byte)meta_api_version))
+                            {
+                                meta_api_state = 0;
+                                break;
+                            }
 
-                        if (meta_api_version < 2)
+                            meta_api_rx_idx = 0;
+
+                            if (meta_api_version < 2)
+                            {
+                                meta_api_len = (Byte)(rx_data & 0x3F);
+                                if (meta_api_version == 0)
+                                {
+                                    meta_api_data_len = get_data_len(meta_api_version, meta_api_len, 0);
+                                    if (meta_api_data_len > 0)
+                                    {
+                                        meta_api_state = 17;
+                                    }
+                                    else
+                                        meta_api_state = 18;
+                                }
+                                else
+                                    meta_api_state = 6;
+                            } else if (meta_api_version == 2)
+                            {
+
+                                meta_api_len = (UInt16)((rx_data & 0x3F) << 8);
+                                meta_api_state = 5;
+                            }
+                            else
+                            {
+                                meta_api_state = 3;
+                            }
+                            break;
+                        case 3:
+                            {
+                                meta_api_data_type = rx_data;
+                                meta_api_state = 4;
+                            }
+                            break;
+                        case 4:
+                            {
+                                meta_api_len = (UInt16)(rx_data);
+                                meta_api_state = 5;
+                            }
+                            break;
+                        case 5:
+                            {
+                                if (meta_api_version == 2)
+                                {
+                                    meta_api_len |= rx_data;
+                                    meta_api_state = 6;
+                                }
+                                else
+                                {
+                                    meta_api_len |= (UInt16)(((UInt16)rx_data) << 8);
+                                    meta_api_state = 40;
+                                }
+                            }
+                            break;
+                        case 40:
+                            meta_api_cmd_type = rx_data;
+                            meta_api_state = 6;
+                            break;
+                        case 6:
+                            meta_api_cmdset = rx_data;
+
+                            if (meta_api_version < 2)
+                                meta_api_state = 8;
+                            else
+                                meta_api_state = 7;
+
+                            break;
+                        case 7:
+                            meta_api_cmdset |= (UInt16)(((UInt16)rx_data) << 8);
                             meta_api_state = 8;
-                        else
-                            meta_api_state = 7;
-                            
-                        break;
-                    case 7:
-                        meta_api_cmdset |= (UInt16)(((UInt16)rx_data) << 8);
-                        meta_api_state = 8;
-                        break;
-                    case 8:
-                        meta_api_cmdid = rx_data;
+                            break;
+                        case 8:
+                            meta_api_cmdid = rx_data;
 
-                        if (meta_api_version <= 1)
-                            meta_api_state = 17;
-                        else
-                            meta_api_state = 9;
-                        break;
-                    case 9:
-                        meta_api_cmdid |= (UInt16)(((UInt16)rx_data) << 8);
-                        
-                        if (meta_api_version == 2)
-                            meta_api_state = 13;
-                        else
-                            meta_api_state = 41;
-                        break;
+                            if (meta_api_version <= 1)
+                            {
+                                meta_api_data_len = get_data_len(meta_api_version, meta_api_len, 0);
+                                if (meta_api_data_len > 0)
+                                {
+                                    meta_api_state = 17;
+                                }
+                                else
+                                    meta_api_state = 18;
+                            }
+                            else
+                                meta_api_state = 9;
+                            break;
+                        case 9:
+                            meta_api_cmdid |= (UInt16)(((UInt16)rx_data) << 8);
 
-                    case 41:
-                        //reserv
-                        meta_api_state = 10;
-                        break;
-                    case 10:
-                        //reserv
-                        meta_api_state = 11;
-                        break;
-                    case 11:
-                        meta_api_extend_len = (Byte)(rx_data & 0x0F);
-                        if(meta_api_extend_len>0)
-                            meta_api_state = 12;
-                        else
-                            meta_api_state = 13;
-                        break;
-                    case 12:
-                        meta_api_extend_idx++;
-                        if (meta_api_extend_idx == meta_api_extend_len)
-                        {
-                            meta_api_state = 13;
-                        }
-                        break;
-                    //seq
-                    case 13:
-                        meta_api_seq = rx_data;
-                        meta_api_state = 14;
-                        break;                                                                                                                                                                                                                       //aGV5IHRoaXMgcHJvZ3JhbSBpcyB3cml0dGVuIGJ5IGh0dHBzOi8vZ2l0aHViLmNvbS95b3VrcGFu
-                    case 14:
-                        meta_api_seq |= (UInt16)(((UInt16)rx_data) << 8);
-                        meta_api_state = 15;
+                            if (meta_api_version == 2)
+                                meta_api_state = 13;
+                            else
+                                meta_api_state = 41;
+                            break;
 
-                        if (meta_api_version < 16)
-                            meta_api_state = 17;
-                        else
+                        case 41:
+                            //reserv
+                            meta_api_state = 10;
+                            break;
+                        case 10:
+                            //reserv
+                            meta_api_state = 11;
+                            break;
+                        case 11:
+                            meta_api_extend_len = (Byte)(rx_data & 0x0F);
+                            if (meta_api_extend_len > 0)
+                                meta_api_state = 12;
+                            else
+                                meta_api_state = 13;
+                            break;
+                        case 12:
+                            meta_api_extend_idx++;
+                            if (meta_api_extend_idx == meta_api_extend_len)
+                            {
+                                meta_api_state = 13;
+                            }
+                            break;
+                        //seq
+                        case 13:
+                            meta_api_seq = rx_data;
+                            meta_api_state = 14;
+                            break;                                                                                                                                                                                                                       //aGV5IHRoaXMgcHJvZ3JhbSBpcyB3cml0dGVuIGJ5IGh0dHBzOi8vZ2l0aHViLmNvbS95b3VrcGFu
+                        case 14:
+                            meta_api_seq |= (UInt16)(((UInt16)rx_data) << 8);
                             meta_api_state = 15;
-                        break;
 
-                    case 15:
-                        meta_api_crc16 = (UInt16)rx_data; 
-                        meta_api_state = 16;
-                        break;
-                    case 16:
-                        meta_api_crc16 |= (UInt16)((UInt16)rx_data << 8);
+                            if (meta_api_version < 16)
+                            {
+                                meta_api_data_len = get_data_len(meta_api_version, meta_api_len, 0);
+                                if (meta_api_data_len > 0)
+                                {
+                                    meta_api_state = 17;
+                                }else
+                                    meta_api_state = 18;
 
-                        UInt16 crc16_d = crc16_obj.crc16_init();
+                            }
+                            else
+                                meta_api_state = 15;
+                            break;
 
-                        meta_api_crc16_calc = crc16_obj.crc16_update(crc16_d, meta_api_buf, (UInt16)(meta_api_buf_idx - 2));
+                        case 15:
+                            meta_api_crc16 = (UInt16)rx_data;
+                            meta_api_state = 16;
+                            break;
+                        case 16:
+                            meta_api_crc16 |= (UInt16)((UInt16)rx_data << 8);
 
-                        if(meta_api_crc16 != meta_api_crc16_calc)
-                        {
-                            meta_api_state = 0;
-                        }
-                        else
-                        {
-                            meta_api_state = 17;
-                        }
-                        break;
-                    case 17:
-                        meta_api_data_buf[meta_api_rx_idx] = rx_data;
-                        meta_api_rx_idx++;
+                            UInt16 crc16_d = crc16_obj.crc16_init();
 
-                        UInt16 data_len = 0;
-                        if (meta_api_version == 0)
-                            data_len = (UInt16)(meta_api_len - 4);
-                        else if (meta_api_version == 1)
-                            data_len = (UInt16)(meta_api_len - 6);
-                        else if (meta_api_version == 2)
-                            data_len = (UInt16)(meta_api_len - 13);
-                        else if (meta_api_version >= 16)
-                            data_len = (UInt16)(meta_api_len - 22 - meta_api_extend_len);
+                            meta_api_crc16_calc = crc16_obj.crc16_update(crc16_d, meta_api_buf, (UInt16)(meta_api_buf_idx - 2));
 
-                        if (meta_api_rx_idx == data_len)
-                        {
-                            meta_api_state = 18;
-                        }
-                        break;
+                            if (meta_api_crc16 != meta_api_crc16_calc)
+                            {
+                                meta_api_state = 0;
+                            }
+                            else
+                            {
+                                meta_api_data_len = get_data_len(meta_api_version, meta_api_len, 0);
+                                if (meta_api_data_len > 0)
+                                {
+                                    meta_api_state = 17;
+                                }
+                                else
+                                    meta_api_state = 18;
+                            }
+                            break;
+                        case 17:
+                            {
+                                /*if (meta_api_buf_idx + meta_api_data_len > 65536)
+                                {
+                                    meta_api_state = 0;
+                                    break;
+                                }*/
+                                //meta_api_state = 43;
+                                if (true)
+                                {
+                                    meta_api_data_buf[meta_api_rx_idx++] = rx_data;
+                                    if (meta_api_rx_idx == meta_api_data_len)
+                                    {
+                                        meta_api_state = 18;
+                                        break;
+                                    }
+                                }else
+                                {
+                                    //copy meta_api_data_len bytes,for speed up 
+                                    //TODO : not pass the test,
+                                    
+                                    meta_api_data_buf[meta_api_rx_idx++] = rx_data;
+                                    if(meta_api_rx_idx!= meta_api_data_len)
+                                    {
+                                        int k = i;
+                                        for (; k < size; k++)
+                                        {
+                                            rx_data = buf[k];
+                                            meta_api_data_buf[meta_api_rx_idx++] = rx_data;
+                                            meta_api_buf[meta_api_buf_idx++] = rx_data;
+                                            if (meta_api_rx_idx == meta_api_data_len)
+                                            {
+                                                break;
+                                            }
+
+                                        }
+                                        i =  k;
+                                    }
+                                    else
+                                    {
+                                        break;
+                                    }
+
+                                    meta_api_state = 18;
+                                }
+
+                                break;
+                            }
                     case 18:
                         if (meta_api_version <=1)
                             meta_api_crc16 = (UInt16)rx_data;
@@ -663,7 +779,7 @@ namespace SerialCom
         public void unit_test()
         {
             //(Byte version, Byte data_type, Byte cmd_type, Byte ENC, UInt16 cmd_set, UInt16 cmd_id, Byte extend_len, UInt16 SEQ, Byte[] data_buf, UInt16 data_len)
-            UInt32 data_len = 1000000;
+            UInt32 data_len = 100000;
             var data_buf = new Byte[data_len];
             for(int i = 0; i < data_len; i++)
             {
@@ -678,7 +794,7 @@ namespace SerialCom
             Byte extend_len = 0;
             UInt16 SEQ = 0x8000;
             Byte[] version_test = new byte[] { 0, 1, 2, 16, 0, 1, 2, 16 };
-            
+            long start_time_pc_ms = DateTime.Now.ToUniversalTime().Ticks / 10000;
             for (int i = 0; i < version_test.Length; i++)
             {
                 version = version_test[i];
@@ -699,6 +815,13 @@ namespace SerialCom
             buf1 = metaverseProtocalGenMassive(16, data_type, cmd_type, ENC, cmd_set, cmd_id, data_buf, data_len);
 
             metaverseProtocalRecev(buf1, buf1.Length);
+
+            //the print will need time ,so will clear quick ,to test the real time use
+            mainform.msg_box_print(String.Format(@"test finished,send&recv time used  {0:F3} ms ", DateTime.Now.ToUniversalTime().Ticks / 10000 - start_time_pc_ms));
+            if(mainform.textBoxReceive.Text.Length > 20000)
+            {
+                mainform.textBoxReceive.Text = "";
+            }
         }
     }
 }
