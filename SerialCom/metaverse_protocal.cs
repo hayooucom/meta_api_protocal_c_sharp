@@ -231,7 +231,7 @@ namespace SerialCom
             }
             if (version >= 16)
             {
-                packet_len_all = (UInt16)(22 + data_len);
+                packet_len_all = (UInt16)(22 + data_len + extend_len);
                 if (data_len > 65535 - 22 - extend_len)
                 {
                     packet_len_all = 65535;
@@ -676,7 +676,12 @@ namespace SerialCom
             for (int i = 0; i < version_test.Length; i++)
             {
                 version = version_test[i];
-                var buf = metaverseProtocalGen(version, data_type, cmd_type, ENC, cmd_set, cmd_id, extend_len, SEQ, data_buf, (UInt16)data_len);
+                var data_len2 = data_len;
+                if (data_len2 > 65535 - 22)
+                {
+                    data_len2 = 65535 - 22;
+                }
+                var buf = metaverseProtocalGen(version, data_type, cmd_type, ENC, cmd_set, cmd_id, extend_len, SEQ, data_buf, (UInt16)data_len2);
 
                 metaverseProtocalRecev(buf, buf.Length);
             }
