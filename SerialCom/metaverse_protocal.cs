@@ -629,7 +629,7 @@ namespace SerialCom
                             }
                             else
                             {
-                                meta_api_data_len = get_data_len(meta_api_version, meta_api_len, 0);
+                                meta_api_data_len = get_data_len(meta_api_version, meta_api_len, meta_api_extend_len);
                                 if (meta_api_data_len > 0)
                                 {
                                     meta_api_state = 17;
@@ -787,7 +787,7 @@ namespace SerialCom
         public void unit_test()
         {
             //(Byte version, Byte data_type, Byte cmd_type, Byte ENC, UInt16 cmd_set, UInt16 cmd_id, Byte extend_len, UInt16 SEQ, Byte[] data_buf, UInt16 data_len)
-            UInt32 data_len = 200000;
+            UInt32 data_len = 120000;
             var data_buf = new Byte[data_len];
             Random rd = new Random();
             for (int i = 0; i < data_len; i++)
@@ -803,7 +803,7 @@ namespace SerialCom
             Byte extend_len = 0;
             UInt16 SEQ = 0x8000;
 
-            Byte[] version_test = new byte[] { 0, 0,1, 1,2, 2, 16, 0, 1, 2, 16 };
+            Byte[] version_test = new byte[] { 0, 1, 2, 16 };
             long start_time_pc_ms = DateTime.Now.ToUniversalTime().Ticks / 10000;
             
             for (int i = 0; i < version_test.Length; i++)
@@ -829,7 +829,7 @@ namespace SerialCom
                 metaverseProtocalRecev(buf, buf.Length);
             }
             
-            version_test = new byte[] {   2, 2, 16, 16 };
+            version_test = new byte[] {   2,  16 };
             for (int i = 0; i < version_test.Length; i++)
             {
                 version = version_test[i];
