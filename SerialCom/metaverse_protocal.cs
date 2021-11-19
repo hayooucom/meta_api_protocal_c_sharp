@@ -36,6 +36,7 @@ namespace SerialCom
         private UInt16 meta_api_extend_idx = 0;
         private List<byte> meta_api_buffer = new List<byte>();
         private int total_package_count = 0;
+        private int total_packege_len2 = 0;
 
         private string last_save_data;
         private long last_time_ticks = 0;
@@ -77,10 +78,12 @@ namespace SerialCom
         {
             Byte[] data_buf_all=new Byte[1];
             int total_packege_len = meta_data_len;
+            
 
             if (version < 2)
             {
                 data_buf_all = meta_api_data_buf;
+                total_packege_len2 = meta_data_len;
             }
             else
             {
@@ -89,6 +92,7 @@ namespace SerialCom
                     meta_api_buffer.AddRange(meta_api_data_buf);
                     data_buf_all = meta_api_buffer.ToArray();
                     meta_api_buffer.Clear();
+                    total_packege_len2 += meta_data_len;
                     total_packege_len = data_buf_all.Length;
                     total_package_count++;
                     /*
@@ -106,6 +110,7 @@ namespace SerialCom
                 else
                 {
                     total_package_count++;
+                    total_packege_len2 += meta_data_len;
                     meta_api_buffer.AddRange(meta_api_data_buf);
                     return 0;
                 }
@@ -118,11 +123,11 @@ namespace SerialCom
                 var spritfstr = "";
                 if ( recieve_ok )
                 {
-                   spritfstr = String.Format(@"recvok ! version  {0:D} ,received len {1:D} , packege_count {2:D}", version, total_packege_len, total_package_count);
+                   spritfstr = String.Format(@"recvok ! version  {0:D} ,received len {1:D} , packege_count {2:D}", version, total_packege_len2, total_package_count);
                 }
                 else
                 {
-                    spritfstr = String.Format(@"some package lost ! version  {0:D} ,received len {1:D} , packege_count {2:D}", version, total_packege_len, total_package_count);
+                    spritfstr = String.Format(@"some package lost ! version  {0:D} ,received len {1:D} , packege_count {2:D}", version, total_packege_len2, total_package_count);
                 }
                 mainform.textBoxReceive.Text += spritfstr + "\r\n"; ;
                 mainform.textBoxReceive.SelectionStart = mainform.textBoxReceive.Text.Length;
@@ -131,6 +136,7 @@ namespace SerialCom
 
             save_packet();
             meta_api_buffer = new List<byte>();
+            total_packege_len2 = 0;
             total_package_count = 0;
             return 0;
         }
@@ -152,6 +158,10 @@ namespace SerialCom
         {
             Byte[] api_buf;
             UInt16 max_payload = 65535 - 22;
+            if(version == 2)
+            {
+                max_payload = 4095 - 13;
+            }
             Byte[] api_buf_all = new byte[(data_len/ max_payload+1) *65535];
             int api_buf_all_idx = 0;
             List<byte> data_buffer = new List<byte>(data_buf.Length);
@@ -161,6 +171,7 @@ namespace SerialCom
             
             UInt16 SEQ = 0x0000;
             int i = 0;
+            int payload_len_all = 0;
             for (;i< data_len; i+= max_payload)
             {
                 UInt16 payload_len = max_payload;
@@ -169,6 +180,7 @@ namespace SerialCom
                     SEQ |= 0x8000;
                     payload_len = (UInt16)(data_len - i);
                 }
+                payload_len_all += payload_len;
                 Byte[] data_buf2 = data_buffer.Skip(i).ToArray();
                 /*Byte[] data_buf2 = new byte[payload_len];//data_buffer.Skip(i).ToArray();
                 for(int j=0;j< payload_len; j++)
