@@ -45,7 +45,7 @@ namespace SerialCom
         }
 
         #region 发送数据包
-        public void send_metaverse_lens_data(float focus_m, UInt16 parm_b, float parm_c)
+        public void send_metaverse_unreal_data(float focus_m, UInt16 parm_b, float parm_c)
         {
             String spritfstr=null;
             if(using_portocal == 0)

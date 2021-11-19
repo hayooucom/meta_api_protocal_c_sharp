@@ -69,7 +69,7 @@ namespace SerialCom
             if (ts - sendStartTime > 30 * 10000)
             {
                 sendStartTime = ts;
-                metaverse_unreal_obj.send_metaverse_lens_data((float)parm_a / 1000, parm_b, parm_c);
+                metaverse_unreal_obj.send_metaverse_unreal_data((float)parm_a / 1000, parm_b, parm_c);
             }
 
         }
@@ -361,7 +361,7 @@ namespace SerialCom
                 {
 
                     meta_api_buf[meta_api_buf_idx++] = rx_data;
-                    if (meta_api_buf_idx > 65535)
+                    if (meta_api_buf_idx >= 65535)
                     {
                         meta_api_state = 0;
                     }
@@ -618,7 +618,7 @@ namespace SerialCom
             }
             catch (System.Exception ex)
             {
-                return;
+                return; 
             }
         }
         #endregion
@@ -646,7 +646,7 @@ namespace SerialCom
                         if (last_save_data != data_hex_str)
                         {
                             last_save_data = data_hex_str;
-                            var write_msg = mainform.rcv_pkg_counter_all + "," + data_hex_str + "\n";
+                            var write_msg = mainform.rcv_pkg_counter_all + "," + time_passed_ms + "," + data_hex_str + "\n";
                             byte[] info = new UTF8Encoding(true).GetBytes(write_msg);
                             mainform.saveDataFS.Write(info, 0, info.Length);
                         }

@@ -12,7 +12,7 @@ namespace SerialCom
     {
         public FileStream loadDataFS = null;
         public bool stop_signal = false;
-        UInt32 start_time_stamp_ms = 0;
+        long start_time_stamp_ms = 0;
         long start_time_pc_ms = 0;
         public MainForm mainform = null;
         long sendStartTime = 0;
@@ -69,23 +69,9 @@ namespace SerialCom
                     continue;
                 }
 
-                var metaverse_protocal_data_buf = HexStringToByteArray(line_a[1]);
+                var metaverse_protocal_data_buf = HexStringToByteArray(line_a[2]);
 
-                UInt32 parm_a = (UInt32)(metaverse_protocal_data_buf[0] & 0x0F) << 16;
-                parm_a |= (UInt32)(metaverse_protocal_data_buf[1] & 0xFF) << 8;
-                parm_a |= (UInt32)metaverse_protocal_data_buf[2];
-
-                UInt16 parm_b = (UInt16)(((UInt16)(metaverse_protocal_data_buf[3] & 0x0F)) << 8);
-                parm_b |= (UInt16)(((UInt16)metaverse_protocal_data_buf[4]));
-
-                float aperture = (float)metaverse_protocal_data_buf[5] / 10;
-                float log2 = (float)(Math.Log((float)aperture) / Math.Log(2.0));
-                float parm_c = (float)((log2 * 2 + 1) * 1000);
-
-                UInt32 time_stamp_ms = (UInt32)(metaverse_protocal_data_buf[6]) << 24;
-                time_stamp_ms |= (UInt32)(metaverse_protocal_data_buf[7]) << 16;
-                time_stamp_ms |= (UInt32)(metaverse_protocal_data_buf[8]) << 8;
-                time_stamp_ms |= (UInt32)(metaverse_protocal_data_buf[9]);
+                long time_stamp_ms = long.Parse( line_a[1]);
 
                 if(start_time_stamp_ms == 0)
                 {
@@ -100,18 +86,20 @@ namespace SerialCom
                     time_pc_ms1 = DateTime.Now.ToUniversalTime().Ticks / 10000;
                 }
 
+                metaverse_protocal_obj.metaverseProtocalRecev(metaverse_protocal_data_buf, metaverse_protocal_data_buf.Length);
+
                 var ts = DateTime.Now.ToUniversalTime().Ticks;
 
                 if (ts - sendStartTime > 30 * 10000)
                 {
                     sendStartTime = ts;
-                    metaverse_protocal_obj.metaverse_unreal_obj.send_metaverse_lens_data((float)parm_a / 1000, parm_b, parm_c);
+                    metaverse_protocal_obj.metaverse_unreal_obj.send_metaverse_unreal_data(1,2,3);
                 }
                 play_counter++;
 
-                if (play_counter % 30 == 1)
+                //if (play_counter % 30 == 1)
                 {
-                    var spritfstr = String.Format(@" {0:F4}m, {1:F1}, {2:D}mm", (float)parm_a / 1000, aperture, parm_b);
+                    var spritfstr = String.Format(@" {0:F4}m, {1:F1}, {2:D}mm", 1,2,3);
                     mainform.msg_box_print( "time:"+ ((float)(time_stamp_ms - start_time_stamp_ms) /1000).ToString() +"S,"+ spritfstr);
                 }
             } 
