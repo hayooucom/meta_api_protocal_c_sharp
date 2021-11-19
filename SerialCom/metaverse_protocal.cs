@@ -174,10 +174,11 @@ namespace SerialCom
         public Byte[] metaverseProtocalGenMassive(Byte version, Byte data_type, Byte cmd_type, Byte ENC, UInt16 cmd_set, UInt16 cmd_id,  Byte[] data_buf, UInt32 data_len)
         {
             Byte[] api_buf;
-            UInt16 max_payload = 65535 - 22;
-            if(version == 2)
+            UInt16 max_payload = meta_api_buf_v16_max_size - 22;
+            //not recommend version <=2 to gen massive buf
+            if (version == 2)
             {
-                max_payload = 4095 - 13;
+                max_payload = meta_api_buf_v2_max_size - 13;
             }
             Byte[] api_buf_all = new byte[(data_len/ max_payload+1) *65535];
             int api_buf_all_idx = 0;
@@ -828,7 +829,7 @@ namespace SerialCom
 
                 metaverseProtocalRecev(buf, buf.Length);
             }
-            
+            //not recommend version <=2 to gen massive buf
             version_test = new byte[] {   2,  16 };
             for (int i = 0; i < version_test.Length; i++)
             {
