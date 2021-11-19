@@ -69,8 +69,8 @@ namespace SerialCom
                     continue;
                 }
 
-                var metaverse_protocal_data_buf = HexStringToByteArray(line_a[2]);
-
+                //var metaverse_protocal_data_buf = HexStringToByteArray(line_a[2]);
+                var metaverse_protocal_data_buf = Convert.FromBase64String(line_a[2]);
                 long time_stamp_ms = long.Parse( line_a[1]);
 
                 if(start_time_stamp_ms == 0)

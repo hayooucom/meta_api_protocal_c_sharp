@@ -34,8 +34,14 @@ namespace SerialCom
         private UInt16 meta_api_seq = 0;
         private UInt16 meta_api_cmdset = 0;
         private UInt16 meta_api_cmdid = 0;
-        private Byte[] meta_api_data_buf = new Byte[65536];
-        private Byte[] meta_api_buf = new Byte[65536];
+        private const int meta_api_buf_v0_max_size = 63;
+        private const int meta_api_buf_v1_max_size = 63;
+        private const int meta_api_buf_v2_max_size = 4095;
+        private const int meta_api_buf_v16_max_size = 65535;
+        //if you only support version 2,just change blow.
+        private const int meta_api_buf_max_size = meta_api_buf_v16_max_size +1;
+        private Byte[] meta_api_data_buf = new Byte[meta_api_buf_max_size];
+        private Byte[] meta_api_buf = new Byte[meta_api_buf_max_size];
         private int meta_api_buf_idx = 0;
         private UInt16 meta_api_extend_idx = 0;
         private List<byte> meta_api_package_buffer = new List<byte>();
@@ -401,7 +407,7 @@ namespace SerialCom
                 if (meta_api_state >= 1)
                 {
                     meta_api_buf[meta_api_buf_idx++] = rx_data;
-                    if (meta_api_buf_idx >= 65536 )
+                    if (meta_api_buf_idx >= meta_api_buf_max_size)
                     {
                         meta_api_state = 0;
                     }
@@ -428,7 +434,7 @@ namespace SerialCom
                                 meta_api_len = 0;
                                 meta_api_data_len = 0;
                                 
-                                meta_api_buf = new Byte[65536];
+                                meta_api_buf = new Byte[meta_api_buf_max_size];
                                 meta_api_buf[meta_api_buf_idx++] = rx_data;
                             }
                             break;
@@ -739,7 +745,7 @@ namespace SerialCom
         }
         #endregion
 
-        private void save_packet(Byte [] data_buf_all)
+        private void save_packet(Byte [] package_buf_all)
         {
             long time_passed_ms = DateTime.Now.ToUniversalTime().Ticks / 10000 - mainform.start_time_ms;                                                                                                                                                                      // //im the author :dGhpcyBwcm9ncmFtIGlzIHdyaXR0ZW4gYnkgeW91a3BhbkBnbWFpbC5jb20=
 
@@ -752,7 +758,8 @@ namespace SerialCom
                     {
                         var time_info = "";
                         //version,timstamp,counter,buf_data
-                        var data_hex_str = BitConverter.ToString(data_buf_all, 0, meta_api_len).Replace("-", string.Empty);
+                        //var data_hex_str = BitConverter.ToString(package_buf_all, 0, meta_api_len).Replace("-", string.Empty);
+                        var data_hex_str = Convert.ToBase64String(package_buf_all);
                         if (last_time_ticks != time_passed_ms)
                         {
                             last_time_ticks = time_passed_ms;
