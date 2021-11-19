@@ -222,36 +222,36 @@ namespace SerialCom
             if (version == 0)
             {
                 packet_len_all = (UInt16)(4 + data_len);
-                if (data_len > 63 - 4)
+                if (data_len > meta_api_buf_v0_max_size - 4)
                 {
-                    packet_len_all = 63;
+                    packet_len_all = meta_api_buf_v0_max_size;
                     data_len = (UInt16)(packet_len_all - 4);
                 }
             }
             if (version == 1)
             {
                 packet_len_all = (UInt16)(6 + data_len);
-                if (data_len > 63 - 6)
+                if (data_len > meta_api_buf_v1_max_size - 6)
                 {
-                    packet_len_all = 63;
+                    packet_len_all = meta_api_buf_v1_max_size;
                     data_len = (UInt16)(packet_len_all - 6);
                 }
             }
             if (version == 2)
             {
                 packet_len_all = (UInt16)(13 + data_len);
-                if (data_len > 4095 - 13)
+                if (data_len > meta_api_buf_v2_max_size - 13)
                 {
-                    packet_len_all = 4095;
+                    packet_len_all = meta_api_buf_v2_max_size;
                     data_len = (UInt16)(packet_len_all - 13);
                 }
             }
             if (version >= 16)
             {
                 packet_len_all = (UInt16)(22 + data_len + extend_len);
-                if (data_len > 65535 - 22 - extend_len)
+                if (data_len > meta_api_buf_v16_max_size - 22 - extend_len)
                 {
-                    packet_len_all = 65535;
+                    packet_len_all = meta_api_buf_v16_max_size;
                     data_len = (UInt16)(packet_len_all - 22 - extend_len);
                 }
             }
